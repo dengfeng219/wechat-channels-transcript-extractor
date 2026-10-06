@@ -1,0 +1,15 @@
+# 视频号文案提取器依赖
+# 注意：PyTorch 建议用阿里云镜像安装（官方源在国内容易断流），详见 setup_env.ps1
+#   pip install torch==2.6.0+cu124 torchaudio==2.6.0+cu124 \
+#       -f https://mirrors.aliyun.com/pytorch-wheels/cu124/ \
+#       -i https://pypi.tuna.tsinghua.edu.cn/simple
+torch==2.6.0+cu124
+torchaudio==2.6.0+cu124
+funasr
+modelscope
+# faster-whisper 1.2.1 与 huggingface_hub 1.x 不兼容（会报 metadata_errors），必须钉在 0.x
+faster-whisper
+huggingface_hub<1.0
+av
+requests
+numpy

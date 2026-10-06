@@ -1,0 +1,8 @@
+# 一律按原样存储，不做换行符转换。
+#
+# 为什么不用常见的 "*.bat text eol=crlf"：
+# 那样仓库里存的是 LF，只有在 git clone 检出时才变回 CRLF；
+# 而从这个网页直接点「Download raw file」拿到的是 LF，
+# cmd.exe 读 LF 换行的 .bat 会把一行拆成乱码命令直接报错。
+# 这里把 CRLF 原样存进仓库，clone 和网页下载拿到的都是对的。
+* -text

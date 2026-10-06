@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>视频号文案提取器</title>
+<style>
+  :root{
+    --bg:#f5f6fa; --card:#fff; --fg:#1b1d23; --muted:#6b7280; --line:#e6e8ef;
+    --brand:#07c160; --brand2:#0a84ff; --warn:#f59e0b; --err:#ef4444;
+    --radius:14px; --shadow:0 1px 3px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 80px}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .logo{width:42px;height:42px;border-radius:12px;flex:0 0 auto;
+        background:linear-gradient(135deg,var(--brand),var(--brand2));
+        display:grid;place-items:center;color:#fff;font-size:21px}
+  h1{font-size:21px;margin:0;font-weight:650}
+  .sub{color:var(--muted);font-size:13px;margin-top:2px}
+  .envbar{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 20px}
+  .chip{background:#fff;border:1px solid var(--line);border-radius:999px;
+        padding:4px 11px;font-size:12.5px;color:var(--muted)}
+  .chip b{color:var(--fg);font-weight:600}
+  .chip.ok{border-color:#bbf7d0;background:#f0fdf4;color:#15803d}
+  .chip.bad{border-color:#fecaca;background:#fef2f2;color:#b91c1c}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+        box-shadow:var(--shadow);padding:20px;margin-bottom:16px}
+  .tabs{display:flex;gap:6px;background:#eef0f6;padding:5px;border-radius:11px;margin-bottom:18px}
+  .tabs button{flex:1;border:0;background:transparent;padding:9px 10px;border-radius:8px;
+        cursor:pointer;font-size:14px;color:var(--muted);font-weight:500}
+  .tabs button.on{background:#fff;color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px;font-weight:500}
+  input[type=text],input[type=password],textarea,select{
+        width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 13px;
+        font:inherit;background:#fbfcfe;outline:none;transition:.15s}
+  input:focus,textarea:focus,select:focus{border-color:var(--brand2);background:#fff;
+        box-shadow:0 0 0 3px rgba(10,132,255,.12)}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row>div{flex:1;min-width:170px}
+  .drop{border:2px dashed #cfd5e2;border-radius:12px;padding:30px;text-align:center;
+        color:var(--muted);cursor:pointer;transition:.15s;background:#fbfcfe}
+  .drop:hover,.drop.hot{border-color:var(--brand2);background:#f0f7ff;color:var(--brand2)}
+  .btn{border:0;border-radius:10px;padding:12px 22px;font:inherit;font-weight:600;
+       cursor:pointer;background:var(--brand);color:#fff;transition:.15s}
+  .btn:hover{filter:brightness(1.07)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn.ghost{background:#eef0f6;color:var(--fg)}
+  .btn.sm{padding:7px 14px;font-size:13px;border-radius:8px}
+  .actions{display:flex;gap:10px;align-items:center;margin-top:18px;flex-wrap:wrap}
+  .hint{font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.65}
+  details summary{cursor:pointer;font-size:13.5px;color:var(--brand2);font-weight:500;
+        list-style:none;user-select:none}
+  details summary::-webkit-details-marker{display:none}
+  details summary:before{content:"▸ ";display:inline-block;transition:.15s}
+  details[open] summary:before{transform:rotate(90deg)}
+  .bar{height:8px;background:#eef0f6;border-radius:99px;overflow:hidden;margin:4px 0 10px}
+  .bar>i{display:block;height:100%;width:0;border-radius:99px;
+        background:linear-gradient(90deg,var(--brand),var(--brand2));transition:width .3s}
+  .stag{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+  pre.log{background:#0f1420;color:#c8d3e6;padding:13px;border-radius:10px;font-size:12px;
+        line-height:1.55;max-height:190px;overflow:auto;margin:12px 0 0;white-space:pre-wrap;
+        font-family:Consolas,"Courier New",monospace}
+  .out{white-space:pre-wrap;background:#fbfcfe;border:1px solid var(--line);border-radius:11px;
+        padding:16px;max-height:440px;overflow:auto;line-height:1.85;font-size:15px}
+  .files{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .files a{text-decoration:none;background:#eef0f6;color:var(--fg);border-radius:8px;
+        padding:7px 13px;font-size:13px;font-weight:500}
+  .files a:hover{background:#e2e6f0}
+  .err{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:11px;
+        padding:14px;font-size:13.5px;white-space:pre-wrap}
+  .hide{display:none!important}
+  .meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  h2{font-size:15px;margin:0 0 12px;font-weight:650}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.4);
+        border-top-color:#fff;border-radius:50%;animation:s .7s linear infinite;
+        vertical-align:-2px;margin-right:7px}
+  @keyframes s{to{transform:rotate(360deg)}}
+  .method{border:1px solid var(--line);border-radius:11px;padding:14px;margin-top:12px;background:#fbfcfe}
+  .ghead{cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px;
+        padding:10px 12px;margin-top:14px;font-size:14px;font-weight:650;
+        border:1px solid var(--line);border-radius:11px;background:#fff;transition:.15s}
+  .ghead:hover{border-color:var(--brand2);background:#f7fbff}
+  .ghead .caret{display:inline-block;font-size:11px;color:var(--muted);transition:transform .15s}
+  .ghead.open .caret{transform:rotate(90deg)}
+  .ghead .cnt{margin-left:auto;font-weight:400;font-size:12.5px;color:var(--muted)}
+  .gbody{display:none;padding-left:4px}
+  .gbody.open{display:block}
+  .gbody .method{margin-top:8px}
+  .mhead{font-size:13.5px;font-weight:650;margin-bottom:6px}
+  .badge{background:var(--brand);color:#fff;border-radius:5px;padding:1px 6px;
+        font-size:11px;font-weight:600;margin-right:6px;vertical-align:1px}
+  code{background:#eef0f6;border-radius:4px;padding:1px 5px;font-size:12.5px;
+        font-family:Consolas,monospace}
+  .warn{color:#b45309}
+  .ok{color:#15803d;font-weight:600}
+  .bad{color:#b91c1c;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">🎬</div>
+    <div>
+      <h1>视频号文案提取器</h1>
+      <div class="sub">微信视频号视频 → 解密 → 本地语音识别 → 文案稿（全本地处理，音视频不上传）</div>
+    </div>
+  </header>
+
+  <div class="envbar" id="envbar"><span class="chip">正在检测环境…</span></div>
+
+  <div class="card">
+    <div class="tabs">
+      <button data-tab="link" class="on">视频号分享链接</button>
+      <button data-tab="file">本地视频 / 音频</button>
+      <button data-tab="direct">视频直链 + 解密密钥</button>
+      <button data-tab="record">录制电脑声音（免登录）</button>
+      <button data-tab="history">历史任务</button>
+    </div>
+
+    <!-- 分享链接（支持批量） -->
+    <div id="pane-link">
+      <label>粘贴视频号分享链接 —— <b>支持一次多条，每行一条</b></label>
+      <textarea id="linkUrl" rows="6" placeholder="https://weixin.qq.com/sph/xxxxxxxxxx&#10;https://weixin.qq.com/sph/yyyyyyyyyy&#10;https://weixin.qq.com/sph/zzzzzzzzzz"></textarea>
+      <div class="hint" id="linkCount" style="margin-top:8px"></div>
+      <div class="hint">
+        获取方式：微信打开视频 → 右下角「分享」→「复制链接」。<br>
+        也可以把微信里复制的<b>整段文字</b>直接粘进来，会自动挑出里面的链接、自动去重。<br>
+        解析需要腾讯元宝登录态（首次要配置一次，见下方「登录态设置」）。
+      </div>
+    </div>
+
+    <!-- 本地文件 -->
+    <div id="pane-file" class="hide">
+      <label>选择或拖入本地视频 / 音频文件</label>
+      <div class="drop" id="drop">点击选择文件，或把文件拖到这里<br>
+        <span style="font-size:12.5px">支持 mp4 / mov / mkv / m4a / mp3 / wav 等</span></div>
+      <input type="file" id="fileInput" class="hide" accept="video/*,audio/*">
+      <div class="hint" id="filePath" style="margin-top:10px"></div>
+    </div>
+
+    <!-- 直链 -->
+    <div id="pane-direct" class="hide">
+      <label>视频直链（finder.video.qq.com 的地址）</label>
+      <textarea id="directUrl" rows="3" placeholder="https://finder.video.qq.com/251/20302/stodownload?..."></textarea>
+      <div style="margin-top:12px">
+        <label>解密密钥 decode_key（可选，加密视频号视频必须填）</label>
+        <input type="text" id="decodeKey" placeholder="例如 2136343393">
+      </div>
+      <div class="hint">若视频来自其它下载工具，粘贴其提供的直链与 decode_key 即可自动解密。</div>
+    </div>
+
+    <!-- 录制电脑声音 -->
+    <div id="pane-record" class="hide">
+      <div class="method" style="margin-top:0">
+        <div class="mhead"><span class="badge">免登录</span>拿不到视频文件时用这个</div>
+        <div class="hint" style="margin:2px 0 10px">
+          视频号视频在微信里能正常播放，但文件拿不到 —— 那就把电脑正在播放的<b>声音</b>录下来做识别。<br>
+          ① 在微信里打开这条视频并<b>播放</b>（保证有声音）<br>
+          ② 回到这里点「开始录制」<br>
+          ③ 视频播完点「停止并转写」
+        </div>
+        <div class="row">
+          <div style="flex:2"><label>录制设备（电脑的声音输出）</label>
+            <select id="recDevice"></select></div>
+          <div style="flex:0 0 auto;align-self:flex-end">
+            <button class="btn" id="recStart">开始录制</button>
+            <button class="btn ghost hide" id="recStop">停止并转写</button>
+          </div>
+        </div>
+        <div class="hint" id="recStatus" style="margin-top:10px"></div>
+      </div>
+    </div>
+
+    <!-- 历史任务 -->
+    <div id="pane-history" class="hide">
+      <div class="actions" style="margin:0 0 12px">
+        <button class="btn ghost sm" id="histRefresh">刷新列表</button>
+        <button class="btn ghost sm" id="histExpandAll">全部展开</button>
+        <button class="btn ghost sm" id="histCollapseAll">全部折叠</button>
+        <button class="btn ghost sm" id="histScan">导入已有任务</button>
+        <button class="btn ghost sm" id="histMigrate">整理文件夹</button>
+        <button class="btn ghost sm" id="histClearAll">清空记录</button>
+        <span class="hint" id="histMsg" style="margin:0"></span>
+      </div>
+      <div id="histList"></div>
+      <div id="histDetail" class="hide" style="margin-top:16px">
+        <div class="actions" style="margin:0 0 10px">
+          <button class="btn sm" id="histCopy">复制文案</button>
+          <button class="btn ghost sm" id="histOpen">打开文件夹</button>
+          <button class="btn ghost sm" id="histBack">← 返回列表</button>
+        </div>
+        <div class="meta" id="histMeta"></div>
+        <div class="out" id="histText"></div>
+        <div class="files" id="histFiles"></div>
+      </div>
+    </div>
+
+    <div class="actions" id="runActions">
+      <div style="min-width:180px">
+        <label>识别引擎</label>
+        <select id="engine">
+          <option value="paraformer">Paraformer 中文（推荐，带标点与时间轴）</option>
+          <option value="sensevoice">SenseVoice（3 倍速、错字更少；字幕无时间轴）</option>
+          <option value="whisper">Whisper large-v3（中英混说）</option>
+        </select>
+      </div>
+      <div style="min-width:130px">
+        <label>语言</label>
+        <select id="language">
+          <option value="zh">中文</option>
+          <option value="auto">自动检测</option>
+          <option value="en">英文</option>
+        </select>
+      </div>
+      <button class="btn" id="go" style="align-self:flex-end">开始提取文案</button>
+    </div>
+
+    <details style="margin-top:18px" id="loginBox">
+      <summary>登录态设置 —— 解析分享链接必填（点这里展开）</summary>
+
+      <div class="method">
+        <div class="mhead"><span class="badge">推荐</span>方式一：一键获取，不用碰开发者工具</div>
+        <div class="hint" style="margin:2px 0 10px">
+          点下面的按钮会弹出一个浏览器窗口 → 用微信扫码登录腾讯元宝 → 本程序自动读取登录态并关闭窗口。
+        </div>
+        <div class="actions" style="margin:0">
+          <button class="btn" id="blStart">一键获取登录态</button>
+          <button class="btn ghost sm hide" id="blCancel">取消</button>
+          <span id="blMsg" class="hint" style="margin:0"></span>
+        </div>
+      </div>
+
+      <div class="method">
+        <div class="mhead">方式二：手动粘贴（已登录的浏览器里复制）</div>
+        <div class="hint" style="margin:2px 0 10px">
+          支持直接粘贴 Cookie 串，也支持<b>整段「复制为 cURL」</b>、请求头片段、Cookie 插件导出的 JSON。<br>
+          <b>最稳的做法</b>：在元宝页面按 F12 → 网络面板 → 筛选框输入 <code>yuanbao</code> →
+          在请求上<b>右键 → 复制 → 以 cURL 格式复制</b> → 粘贴到下面。<br>
+          <span class="warn">注意：别选 <code>api.aida.qq.com</code>、<code>google-analytics</code>、
+          <code>sentry</code> 这类第三方统计请求，它们不带元宝的 Cookie。</span>
+        </div>
+        <textarea id="cookie" rows="3" placeholder="把「以 cURL 格式复制」的整段内容，或 Cookie 串粘到这里"></textarea>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn sm" id="importCookie">导入并保存</button>
+          <button class="btn ghost sm" id="testCookie">检测登录态</button>
+          <span id="cookieMsg" class="hint" style="margin:0"></span>
+        </div>
+      </div>
+    </details>
+  </div>
+
+
+    <!-- 文案校对设置 -->
+    <details style="margin-top:14px" id="proofBox">
+      <summary>文案校对设置 —— 大幅减少错别字（点这里展开）</summary>
+
+      <div class="method">
+        <div class="mhead"><span class="badge">推荐</span>AI 上下文校对</div>
+        <div class="hint" style="margin:2px 0 10px">
+          识别引擎是<b>逐音判断</b>的，像「就算这里了，点个恨通」这种同音字，
+          只有懂上下文才改得对。填一个大模型 API Key，每次提取完会自动校对一遍。
+          <br>Key 只存在本机 <code>config.json</code>，只发给你填的这个接口。
+        </div>
+        <label>API Key（DeepSeek / 任何 OpenAI 兼容接口）</label>
+        <input type="password" id="llmKey" placeholder="sk-xxxxxxxx（留空则关闭 AI 校对）">
+        <div class="row" style="margin-top:10px">
+          <div><label>接口地址</label><input type="text" id="llmBase" placeholder="https://api.deepseek.com"></div>
+          <div><label>模型</label><input type="text" id="llmModel" placeholder="deepseek-chat"></div>
+        </div>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn sm" id="llmSave">保存</button>
+          <span class="hint" id="llmMsg" style="margin:0"></span>
+        </div>
+      </div>
+
+      <div class="method">
+        <div class="mhead">自定义替换表（离线生效，不需要 Key）</div>
+        <div class="hint" style="margin:2px 0 10px">
+          每行一条，格式 <code>错词=对词</code>。内置了一批短剧常见套话的修正
+          （如 点个恨通→点个赞吧、留不接→留不住）。遇到反复出现的错字就加到这儿。
+        </div>
+        <textarea id="ruleBox" rows="4" placeholder="就算这里了，点个恨通=看到这里了，点个赞吧"></textarea>
+        <label style="margin-top:10px">试一段文本</label>
+        <textarea id="proofSample" rows="2" placeholder="粘一句识别错的文案进来，点「试一下」看效果"></textarea>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn sm" id="ruleSave">保存替换表</button>
+          <button class="btn ghost sm" id="proofTest">试一下</button>
+          <span class="hint" id="proofMsg" style="margin:0"></span>
+        </div>
+        <div class="out hide" id="proofOut" style="margin-top:10px;max-height:220px"></div>
+      </div>
+    </details>
+  <!-- 进度 -->
+  <div class="card hide" id="progCard">
+    <h2 id="progTitle">正在处理…</h2>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="stag"><span id="stageName">准备中</span><span id="stagePct">0%</span></div>
+    <pre class="log" id="log"></pre>
+  </div>
+
+  <!-- 错误 -->
+  <div class="card hide" id="errCard"><div class="err" id="errBody"></div></div>
+
+  <!-- 结果 -->
+  <div class="card hide" id="resCard">
+    <h2 id="resTitle">提取结果</h2>
+    <div id="singleRes">
+      <div class="meta" id="resMeta"></div>
+      <div class="actions" style="margin:0 0 12px">
+        <button class="btn sm" id="copyBtn">复制全文</button>
+        <button class="btn ghost sm" id="openBtn">打开输出文件夹</button>
+      </div>
+      <div class="out" id="resText"></div>
+      <div class="files" id="resFiles"></div>
+    </div>
+    <div id="batchList" class="hide"></div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const api = async (p, body) => {
+  const r = await fetch(p, body === undefined ? {} : {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  const j = await r.json().catch(() => ({error: '响应不是 JSON'}));
+  if (!r.ok && j.error) throw new Error(j.error);
+  return j;
+};
+
+let TAB = 'link', LOCAL_PATH = '', JOB = null, RESULT = null, TIMER = null;
+let LAST_LINK = null;   // 上一次解析失败的分享链接，登录成功后自动重试
+
+/* ---- 环境 ---- */
+(async () => {
+  try {
+    const e = await api('/api/env');
+    const v = e.env, chips = [];
+    chips.push(v.cuda
+      ? `<span class="chip ok">GPU <b>${v.gpu}</b></span>`
+      : `<span class="chip bad">未检测到 CUDA，将用 CPU（较慢）</span>`);
+    chips.push(`<span class="chip">torch <b>${v.torch || '未装'}</b></span>`);
+    chips.push(v.funasr && v.funasr !== '未安装'
+      ? `<span class="chip ok">FunASR <b>${v.funasr}</b></span>`
+      : `<span class="chip bad">FunASR 未安装</span>`);
+    chips.push(v.faster_whisper && v.faster_whisper !== '未安装'
+      ? `<span class="chip ok">faster-whisper <b>${v.faster_whisper}</b></span>`
+      : `<span class="chip">faster-whisper 未装</span>`);
+    chips.push(`<span class="chip">PyAV <b>${v.av || '未装'}</b></span>`);
+    chips.push(e.has_saved_cookie
+      ? `<span class="chip ok">登录态 <b>已保存</b></span>`
+      : `<span class="chip bad">登录态 <b>未配置</b></span>`);
+    $('#envbar').innerHTML = chips.join('');
+  } catch (err) {
+    $('#envbar').innerHTML = '<span class="chip bad">环境检测失败：' + err.message + '</span>';
+  }
+  const saved = localStorage.getItem('yb_cookie');
+  if (saved) $('#cookie').value = saved;
+})();
+
+/* ---- 切换标签 ---- */
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  TAB = b.dataset.tab;
+  ['link','file','direct','record','history'].forEach(t =>
+    $('#pane-' + t).classList.toggle('hide', t !== TAB));
+  // 历史页不需要「识别引擎 / 开始提取」和登录态设置
+  const isHist = (TAB === 'history');
+  if ($('#runActions')) $('#runActions').classList.toggle('hide', isHist);
+  if ($('#loginBox')) $('#loginBox').classList.toggle('hide', isHist);
+  if ($('#proofBox')) $('#proofBox').classList.toggle('hide', isHist);
+  if (TAB === 'record') loadRecDevices();
+  if (TAB === 'history') loadHistory();
+  try { history.replaceState(null, '', TAB === 'history' ? '#history' : '#') } catch (e) {}
+});
+
+/* 支持用 #history 直接打开历史页 */
+function openTabByName(name) {
+  const b = [...document.querySelectorAll('.tabs button')].find(x => x.dataset.tab === name);
+  if (b) b.click();
+}
+if (location.hash === '#history') setTimeout(() => openTabByName('history'), 150);
+
+/* ---- 批量链接：实时统计 ---- */
+let LINK_TIMER = null;
+$('#linkUrl').addEventListener('input', () => {
+  if (LINK_TIMER) clearTimeout(LINK_TIMER);
+  LINK_TIMER = setTimeout(updateLinkCount, 350);
+});
+async function updateLinkCount() {
+  const t = $('#linkUrl').value.trim();
+  const el = $('#linkCount');
+  if (!t) { el.innerHTML = ''; return; }
+  try {
+    const r = await api('/api/extract_urls', {text: t});
+    el.innerHTML = r.count
+      ? ('识别到 <b>' + r.count + '</b> 条链接' + (r.count > 1 ? '，将 <b>批量排队处理</b>' : ''))
+      : '<span class="bad">还没识别到有效链接（应形如 https://weixin.qq.com/sph/xxxx）</span>';
+  } catch (e) { el.innerHTML = ''; }
+}
+
+/* ---- 本地文件 ---- */
+$('#drop').onclick = () => $('#fileInput').click();
+$('#fileInput').onchange = e => { if (e.target.files[0]) upload(e.target.files[0]); };
+['dragenter','dragover'].forEach(ev => $('#drop').addEventListener(ev, e => {
+  e.preventDefault(); $('#drop').classList.add('hot');
+}));
+['dragleave','drop'].forEach(ev => $('#drop').addEventListener(ev, e => {
+  e.preventDefault(); $('#drop').classList.remove('hot');
+}));
+$('#drop').addEventListener('drop', e => {
+  const f = e.dataTransfer.files[0]; if (f) upload(f);
+});
+
+async function upload(file) {
+  $('#filePath').textContent = '正在上传 ' + file.name + ' …';
+  try {
+    const r = await fetch('/api/upload', {
+      method: 'POST', headers: {'X-Filename': encodeURIComponent(file.name)}, body: file
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || '上传失败');
+    LOCAL_PATH = j.path;
+    $('#filePath').innerHTML = '已就绪：<b>' + file.name + '</b>（' +
+      (j.size/1048576).toFixed(1) + ' MB）';
+  } catch (err) { $('#filePath').textContent = '上传失败：' + err.message; }
+}
+
+/* ---- 录制电脑声音（免登录兜底方案） ---- */
+let REC_TIMER = null;
+async function loadRecDevices() {
+  const sel = $('#recDevice');
+  if (sel.options.length) return;
+  try {
+    const r = await api('/api/record/devices');
+    if (!r.supported) { $('#recStatus').textContent = '本机不支持录制系统声音（缺少 pyaudiowpatch）'; return; }
+    sel.innerHTML = (r.devices || []).map(d =>
+      '<option value="' + d.index + '"' + (d.default ? ' selected' : '') + '>' +
+      d.name + '（' + d.channels + 'ch ' + d.rate + 'Hz）' + (d.default ? ' ★默认输出' : '') +
+      '</option>').join('');
+    if (!r.devices || !r.devices.length) $('#recStatus').textContent = '没有找到可录制的输出设备';
+  } catch (e) { $('#recStatus').textContent = '读取设备失败：' + e.message; }
+}
+$('#recStart').onclick = async () => {
+  $('#recStatus').className = 'hint';
+  $('#recStatus').textContent = '正在启动录制…';
+  try {
+    const r = await api('/api/record/start', {device_index: parseInt($('#recDevice').value, 10)});
+    if (!r.ok) throw new Error(r.error || '启动失败');
+    $('#recStart').classList.add('hide');
+    $('#recStop').classList.remove('hide');
+    pollRec();
+  } catch (e) { $('#recStatus').className = 'hint bad'; $('#recStatus').textContent = '失败：' + e.message; }
+};
+$('#recStop').onclick = async () => {
+  $('#recStop').disabled = true;
+  if (REC_TIMER) { clearTimeout(REC_TIMER); REC_TIMER = null; }
+  $('#recStatus').textContent = '正在停止并提交转写…';
+  try {
+    const r = await api('/api/record/stop', {engine: $('#engine').value, language: $('#language').value});
+    if (!r.ok) throw new Error(r.error || '停止失败');
+    $('#recStart').classList.remove('hide');
+    $('#recStop').classList.add('hide');
+    $('#recStop').disabled = false;
+    $('#recStatus').textContent = '已录制 ' + r.seconds + ' 秒，正在转写…';
+    $('#progCard').classList.remove('hide');
+    JOB = r.job_id; poll();
+  } catch (e) {
+    $('#recStop').disabled = false;
+    $('#recStatus').className = 'hint bad';
+    $('#recStatus').textContent = '失败：' + e.message;
+  }
+};
+async function pollRec() {
+  try {
+    const s = await api('/api/record/status');
+    if (!s.recording) {
+      $('#recStart').classList.remove('hide'); $('#recStop').classList.add('hide');
+      if (s.error) { $('#recStatus').className = 'hint bad'; $('#recStatus').textContent = s.error; }
+      return;
+    }
+    const bars = Math.min(20, Math.round((s.level || 0) * 60));
+    $('#recStatus').className = 'hint ok';
+    $('#recStatus').textContent = '● 正在录制 ' + s.seconds.toFixed(1) + ' 秒　音量 '
+      + '█'.repeat(bars) + '░'.repeat(20 - bars) + '　' + (s.device || '');
+    REC_TIMER = setTimeout(pollRec, 500);
+  } catch (e) { REC_TIMER = setTimeout(pollRec, 1000); }
+}
+
+
+/* ---- 文案校对设置 ---- */
+async function loadProofInfo() {
+  try {
+    const r = await api("/api/proofread/info");
+    $("#llmBase").value = r.base_url || "";
+    $("#llmModel").value = r.model || "";
+    $("#ruleBox").value = r.rules_text || "";
+    $("#llmMsg").className = "hint " + (r.has_key ? "ok" : "");
+    $("#llmMsg").textContent = (r.has_key ? "✓ AI 校对已开启" : "未配置 Key，只做离线替换")
+      + "（内置 " + r.builtin_rules + " 条规则）";
+    if (r.has_key) $("#llmKey").placeholder = "已保存（留空则不改动）";
+  } catch (e) {}
+}
+setTimeout(loadProofInfo, 600);
+
+$("#llmSave").onclick = async () => {
+  const payload = {base_url: $("#llmBase").value.trim(), model: $("#llmModel").value.trim()};
+  const k = $("#llmKey").value.trim();
+  if (k) payload.api_key = k;
+  else if ($("#llmKey").placeholder.indexOf("已保存") < 0) payload.api_key = "";
+  $("#llmMsg").className = "hint";
+  $("#llmMsg").textContent = "保存中…";
+  try {
+    const r = await api("/api/proofread/save", payload);
+    $("#llmMsg").className = "hint " + (r.has_key ? "ok" : "");
+    $("#llmMsg").textContent = r.has_key ? "✓ 已保存，AI 校对已开启" : "已保存（未填 Key，AI 校对关闭）";
+    if (k) { $("#llmKey").value = ""; $("#llmKey").placeholder = "已保存（留空则不改动）"; }
+  } catch (e) { $("#llmMsg").className = "hint bad"; $("#llmMsg").textContent = "保存失败：" + e.message; }
+};
+
+$("#ruleSave").onclick = async () => {
+  $("#proofMsg").className = "hint";
+  $("#proofMsg").textContent = "保存中…";
+  try {
+    const r = await api("/api/proofread/save", {rules: $("#ruleBox").value});
+    $("#proofMsg").className = "hint ok";
+    $("#proofMsg").textContent = "✓ 已保存 " + r.rules + " 条自定义替换";
+  } catch (e) { $("#proofMsg").className = "hint bad"; $("#proofMsg").textContent = "保存失败：" + e.message; }
+};
+
+$("#proofTest").onclick = async () => {
+  const t = $("#proofSample").value.trim();
+  if (!t) { $("#proofMsg").className = "hint bad"; $("#proofMsg").textContent = "先粘一段文本"; return; }
+  $("#proofMsg").className = "hint";
+  $("#proofMsg").textContent = "测试中…（调 AI 可能要几秒）";
+  $("#proofOut").classList.add("hide");
+  try {
+    const r = await api("/api/proofread/test", {text: t});
+    let s = "① 固定替换命中 " + r.rules_hits + " 处：\n" + r.after_rules;
+    if (r.after_llm) s += "\n\n② AI 校对后（" + r.note + "）：\n" + r.after_llm;
+    else s += "\n\n② " + r.note;
+    $("#proofOut").textContent = s;
+    $("#proofOut").classList.remove("hide");
+    $("#proofMsg").className = "hint ok";
+    $("#proofMsg").textContent = "完成";
+  } catch (e) { $("#proofMsg").className = "hint bad"; $("#proofMsg").textContent = "失败：" + e.message; }
+};
+
+
+/* ---- 登录态：方式一 一键获取 ---- */
+let BL_TIMER = null;
+$('#blStart').onclick = async () => {
+  $('#blMsg').className = 'hint';
+  $('#blMsg').textContent = '正在准备…';
+  $('#blStart').disabled = true;
+  $('#blCancel').classList.remove('hide');
+  try { await api('/api/browser_login', {}); } catch (e) {
+    $('#blMsg').textContent = '启动失败：' + e.message;
+    $('#blStart').disabled = false; $('#blCancel').classList.add('hide'); return;
+  }
+  pollBrowserLogin();
+};
+$('#blCancel').onclick = async () => { await api('/api/browser_login_cancel', {}); };
+
+async function pollBrowserLogin() {
+  try {
+    const s = await api('/api/browser_login_status');
+    $('#blMsg').textContent = s.message || s.stage || '';
+    if (s.running) { BL_TIMER = setTimeout(pollBrowserLogin, 1200); return; }
+    $('#blStart').disabled = false;
+    $('#blCancel').classList.add('hide');
+    if (s.ok) {
+      $('#blMsg').className = 'hint ok';
+      $('#cookie').value = s.cookie || '';
+      localStorage.setItem('yb_cookie', s.cookie || '');
+      if (LAST_LINK && LAST_LINK.url) {
+        $('#blMsg').textContent = '✓ 登录成功，正在自动重试刚才的链接…';
+        $('#linkUrl').value = LAST_LINK.url;
+        document.querySelectorAll('.tabs button').forEach(x =>
+          x.classList.toggle('on', x.dataset.tab === 'link'));
+        TAB = 'link';
+        ['link','file','direct'].forEach(t => $('#pane-' + t).classList.toggle('hide', t !== 'link'));
+        setTimeout(() => $('#go').click(), 400);
+        return;
+      }
+      $('#blMsg').textContent = '✓ 登录态已获取并保存，现在可以直接解析分享链接了';
+    } else {
+      $('#blMsg').className = 'hint bad';
+      $('#blMsg').textContent = '✗ ' + (s.error || '获取失败，请改用方式二');
+    }
+  } catch (e) {
+    BL_TIMER = setTimeout(pollBrowserLogin, 1500);
+  }
+}
+
+/* ---- 登录态：方式二 手动粘贴 ---- */
+$('#importCookie').onclick = async () => {
+  const text = $('#cookie').value.trim();
+  if (!text) { $('#cookieMsg').className='hint bad'; $('#cookieMsg').textContent='请先粘贴内容'; return; }
+  $('#cookieMsg').className = 'hint';
+  $('#cookieMsg').textContent = '解析中…';
+  try {
+    const r = await api('/api/import_cookie', {text});
+    if (!r.ok) { $('#cookieMsg').className='hint bad'; $('#cookieMsg').textContent = r.error; return; }
+    localStorage.setItem('yb_cookie', r.cookie);
+    $('#cookie').value = r.cookie;
+    $('#cookieMsg').className = 'hint ' + (r.login_ok ? 'ok' : 'bad');
+    $('#cookieMsg').textContent = r.login_ok
+      ? ('✓ 已提取 ' + r.count + ' 个 Cookie，登录态有效并已保存到本机：' + r.message)
+      : ('已提取 ' + r.count + ' 个 Cookie，但登录态无效：' + r.message);
+  } catch (e) { $('#cookieMsg').className='hint bad'; $('#cookieMsg').textContent = '解析失败：' + e.message; }
+};
+$('#testCookie').onclick = async () => {
+  $('#cookieMsg').className = 'hint';
+  $('#cookieMsg').textContent = '检测中…';
+  try {
+    const r = await api('/api/check_login', {cookie: $('#cookie').value.trim()});
+    $('#cookieMsg').className = 'hint ' + (r.ok ? 'ok' : 'bad');
+    $('#cookieMsg').textContent = (r.ok ? '✓ ' : '✗ ') + r.message;
+  } catch (e) { $('#cookieMsg').className='hint bad'; $('#cookieMsg').textContent = '检测失败：' + e.message; }
+};
+
+/* ---- 开始 ---- */
+$('#go').onclick = async () => {
+  $('#errCard').classList.add('hide'); $('#resCard').classList.add('hide');
+  const base = {engine: $('#engine').value, language: $('#language').value,
+                cookie: $('#cookie').value.trim()};
+  let req, batchUrls = null;
+  if (TAB === 'link') {
+    const text = $('#linkUrl').value.trim();
+    if (!text) return fail('请先粘贴视频号分享链接');
+    let found;
+    try { found = await api('/api/extract_urls', {text}); }
+    catch (e) { return fail('解析链接失败：' + e.message); }
+    if (!found.count) return fail('没识别到有效的视频号分享链接（应形如 https://weixin.qq.com/sph/xxxx）');
+    if (found.count > 1) batchUrls = found.urls;
+    else req = Object.assign(base, {source: 'link', url: found.urls[0]});
+  } else if (TAB === 'file') {
+    if (!LOCAL_PATH) return fail('请先选择本地文件');
+    req = Object.assign(base, {source: 'file', path: LOCAL_PATH});
+  } else {
+    const u = $('#directUrl').value.trim();
+    if (!u) return fail('请先粘贴视频直链');
+    req = Object.assign(base, {source: 'direct', url: u, decode_key: $('#decodeKey').value.trim()});
+  }
+  LAST_LINK = (!batchUrls && req && req.source === 'link') ? {url: req.url} : null;
+
+  $('#go').disabled = true;
+  $('#go').innerHTML = '<span class="spin"></span>处理中…';
+  $('#progTitle').textContent = '正在处理…';
+  $('#progCard').classList.remove('hide');
+  $('#bar').style.width = '0%';
+  $('#stageName').textContent = '提交任务…';
+  $('#stagePct').textContent = '0%';
+  $('#log').textContent = '';
+  try {
+    if (batchUrls) {
+      const j = await api('/api/transcribe', Object.assign({urls: batchUrls}, base));
+      if (!j.ok) throw new Error(j.error || '批量任务创建失败');
+      BATCH = j.jobs.map(x => ({job_id: x.job_id, url: x.url, status: 'queued',
+                                percent: 0, stage: '', result: null, error: ''}));
+      BATCH_SIG = '';
+      $('#progTitle').textContent = '批量处理 ' + BATCH.length + ' 条';
+      renderBatch();
+      pollBatch();
+      return;
+    }
+    const j = await api('/api/transcribe', req);
+    if (!j.ok) throw new Error(j.error || '任务创建失败');
+    JOB = j.job_id;
+    poll();
+  } catch (e) { stop(); fail(e.message); }
+};
+
+function stop() {
+  $('#go').disabled = false;
+  $('#go').textContent = '开始提取文案';
+  if (TIMER) { clearTimeout(TIMER); TIMER = null; }
+}
+
+function fail(msg) {
+  $('#errBody').textContent = msg;
+  $('#errCard').classList.remove('hide');
+  return false;
+}
+
+async function poll() {
+  if (!JOB) return;
+  try {
+    const j = await api('/api/job?id=' + encodeURIComponent(JOB));
+    const p = j.progress || {};
+    $('#bar').style.width = (p.percent || 0) + '%';
+    $('#stageName').textContent = p.stage || '处理中';
+    $('#stagePct').textContent = (p.percent || 0) + '%';
+    if (j.logs && j.logs.length) {
+      const el = $('#log'); el.textContent = j.logs.join('\n');
+      el.scrollTop = el.scrollHeight;
+    }
+    if (j.status === 'done') { stop(); show(j.result); return; }
+    if (j.status === 'error') { stop(); fail(j.error + '\n\n' + (j.trace || '')); return; }
+  } catch (e) { stop(); fail(e.message); return; }
+  TIMER = setTimeout(poll, 900);
+}
+
+function show(r) {
+  RESULT = r;
+  $('#progCard').classList.add('hide');
+  $('#resCard').classList.remove('hide');
+  const m = r.meta || {}, s = r.stats || {};
+  $('#resMeta').innerHTML = [
+    m.title ? '标题：' + m.title : '',
+    m.author ? '作者：' + m.author : '',
+    s.chars ? '字数：' + s.chars : '',
+    '引擎：' + (s.engine || ''),
+    '耗时：' + (r.elapsed || 0).toFixed(1) + 's'
+  ].filter(Boolean).map(x => '<span class="chip">' + x + '</span>').join('');
+  $('#resText').textContent = (r.paragraphs || []).map(p => p.text).join('\n\n') || r.text;
+  const names = {txt:'TXT 文案', srt:'SRT 字幕', md:'Markdown 文稿', json:'JSON 数据', video:'视频文件'};
+  $('#resFiles').innerHTML = Object.entries(r.files || {}).map(([k, p]) =>
+    `<a href="/api/file?path=${encodeURIComponent(p)}" target="_blank">${names[k] || k}</a>`).join('');
+}
+
+/* ================= 批量处理 ================= */
+let BATCH = null, BATCH_SIG = '', BATCH_RENDERED = [];
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function textOf(r) {
+  if (!r) return '';
+  const ps = (r.paragraphs || []).map(p => p.text).filter(Boolean);
+  return ps.length ? ps.join('\n\n') : (r.text || '');
+}
+function shortUrl(u) {
+  const m = /sph\/([A-Za-z0-9_-]+)/.exec(u || '');
+  return m ? ('sph/' + m[1]) : (u || '');
+}
+const FILE_NAMES = {txt:'TXT 文案', srt:'SRT 字幕', md:'Markdown 文稿', json:'JSON 数据', video:'视频文件'};
+
+function renderBatch() {
+  if (!BATCH) return;
+  $('#singleRes').classList.add('hide');
+  $('#batchList').classList.remove('hide');
+  $('#resTitle').textContent = '批量提取结果（' + BATCH.length + ' 条）';
+  $('#batchList').innerHTML = BATCH.map((b, i) => {
+    const label = {queued:'排队中', running:'处理中', done:'完成', error:'失败'}[b.status] || b.status;
+    const cls = b.status === 'done' ? 'ok' : (b.status === 'error' ? 'bad' : '');
+    const st = '<span class="' + cls + '">' + label +
+      (b.status !== 'done' && b.status !== 'error' ? ' ' + (b.percent || 0) + '%' : '') + '</span>';
+    let body = '';
+    if (b.status === 'done' && b.result) {
+      const m = b.result.meta || {}, s = b.result.stats || {};
+      body += '<div class="meta">' + [
+        m.title ? '标题：' + m.title : '',
+        m.author ? '作者：' + m.author : '',
+        s.chars ? s.chars + ' 字' : '',
+        '耗时 ' + (b.result.elapsed || 0).toFixed(1) + 's'
+      ].filter(Boolean).map(x => '<span class="chip">' + esc(x) + '</span>').join('') + '</div>';
+      body += '<div class="actions" style="margin:0 0 8px">' +
+        '<button class="btn sm" data-bcopy="' + i + '">复制文案</button>' +
+        '<button class="btn ghost sm" data-bopen="' + i + '">打开文件夹</button>' +
+        '<button class="btn ghost sm" data-bsave="' + i + '">下载 TXT</button></div>';
+      body += '<div class="out">' + esc(textOf(b.result)) + '</div>';
+    } else if (b.status === 'error') {
+      body = '<div class="err">' + esc(b.error || '失败') + '</div>';
+    } else {
+      body = '<div class="hint">' + esc(b.stage || '等待中…') + '</div>';
+    }
+    return '<div class="method"><div class="mhead">' + (i + 1) + '. ' +
+      esc(shortUrl(b.url)) + '　' + st + '</div>' + body + '</div>';
+  }).join('');
+  BATCH_RENDERED = BATCH.map(b => ({result: b.result, url: b.url}));
+}
+
+async function pollBatch() {
+  if (!BATCH) return;
+  let pending = 0;
+  for (const b of BATCH) {
+    if (b.status === 'done' || b.status === 'error') continue;
+    try {
+      const j = await api('/api/job?id=' + encodeURIComponent(b.job_id));
+      b.status = j.status;
+      const p = j.progress || {};
+      b.percent = Math.round(p.percent || 0);
+      b.stage = p.stage || '';
+      if (j.status === 'done') b.result = j.result;
+      if (j.status === 'error') b.error = j.error || '失败';
+      if (j.status !== 'done' && j.status !== 'error') pending++;
+    } catch (e) { pending++; }
+  }
+  const done = BATCH.filter(x => x.status === 'done').length;
+  const errs = BATCH.filter(x => x.status === 'error').length;
+  const avg = BATCH.reduce((s, x) => s + (x.status === 'done' ? 100 : (x.percent || 0)), 0) / BATCH.length;
+  $('#bar').style.width = avg.toFixed(1) + '%';
+  $('#stagePct').textContent = Math.round(avg) + '%';
+  const cur = BATCH.find(x => x.status !== 'done' && x.status !== 'error');
+  $('#stageName').textContent = '第 ' + (done + errs + (cur ? 1 : 0)) + '/' + BATCH.length +
+    ' 条　完成 ' + done + (errs ? '，失败 ' + errs : '') + (cur ? ('　' + (cur.stage || '')) : '');
+  if (cur) {
+    try {
+      const j = await api('/api/job?id=' + encodeURIComponent(cur.job_id));
+      if (j.logs && j.logs.length) { const el = $('#log'); el.textContent = j.logs.join('\n'); el.scrollTop = el.scrollHeight; }
+    } catch (e) {}
+  }
+  const sig = BATCH.map(x => x.status + (x.percent || 0)).join('|');
+  if (sig !== BATCH_SIG) { BATCH_SIG = sig; renderBatch(); }
+  if (pending === 0) {
+    stop();
+    $('#go').textContent = '开始提取文案';
+    $('#resCard').classList.remove('hide');
+    $('#progTitle').textContent = '批量完成：成功 ' + done + ' 条' + (errs ? ('，失败 ' + errs + ' 条') : '');
+    BATCH = null;
+    return;
+  }
+  TIMER = setTimeout(pollBatch, 1200);
+}
+
+$('#batchList').addEventListener('click', async (ev) => {
+  const t = ev.target.closest('button');
+  if (!t) return;
+  const idx = t.dataset.bcopy || t.dataset.bopen || t.dataset.bsave;
+  if (idx == null) return;
+  const b = BATCH_RENDERED[Number(idx)];
+  if (!b || !b.result) return;
+  if (t.dataset.bcopy != null) {
+    try { await navigator.clipboard.writeText(textOf(b.result)); t.textContent = '已复制 ✓'; }
+    catch (e) { t.textContent = '复制失败'; }
+    setTimeout(() => t.textContent = '复制文案', 1600);
+  } else if (t.dataset.bopen != null) {
+    await api('/api/open_folder', {path: b.result.outdir});
+  } else if (t.dataset.bsave != null) {
+    const p = (b.result.files || {}).txt;
+    if (p) window.open('/api/file?path=' + encodeURIComponent(p), '_blank');
+  }
+});
+$('#copyBtn').onclick = async () => {
+  if (!RESULT) return;
+  const t = $('#resText').textContent;
+  try { await navigator.clipboard.writeText(t); $('#copyBtn').textContent = '已复制 ✓'; }
+  catch { $('#copyBtn').textContent = '复制失败，请手动选择'; }
+  setTimeout(() => $('#copyBtn').textContent = '复制全文', 1600);
+};
+$('#openBtn').onclick = async () => {
+  if (!RESULT) return;
+  await api('/api/open_folder', {path: RESULT.outdir});
+};
+
+/* ================= 历史任务 ================= */
+let HIST = [], HIST_CUR = null;
+let OPEN_GROUPS = new Set(), ORDER = [], GROUPS_SAVED = false;
+
+/* 记住哪些短剧是展开的（存在浏览器本地） */
+function loadOpenGroups() {
+  try {
+    const raw = localStorage.getItem('wxt_open_groups');
+    if (raw === null) { GROUPS_SAVED = false; OPEN_GROUPS = new Set(); }
+    else { GROUPS_SAVED = true; OPEN_GROUPS = new Set(JSON.parse(raw) || []); }
+  } catch (e) { GROUPS_SAVED = false; OPEN_GROUPS = new Set(); }
+}
+function saveOpenGroups() {
+  GROUPS_SAVED = true;
+  try { localStorage.setItem('wxt_open_groups', JSON.stringify([...OPEN_GROUPS])); } catch (e) {}
+}
+function toggleGroup(gi, force) {
+  const name = ORDER[gi];
+  if (name == null) return;
+  const want = (force === undefined) ? !OPEN_GROUPS.has(name) : !!force;
+  if (want) OPEN_GROUPS.add(name); else OPEN_GROUPS.delete(name);
+  saveOpenGroups();
+  const head = document.querySelector('[data-gtoggle="' + gi + '"]');
+  const body = document.querySelector('[data-gbody="' + gi + '"]');
+  if (head) head.classList.toggle('open', want);
+  if (body) body.classList.toggle('open', want);
+}
+
+async function loadHistory() {
+  loadOpenGroups();
+  $('#histDetail').classList.add('hide');
+  $('#histList').classList.remove('hide');
+  $('#histMsg').className = 'hint';
+  $('#histMsg').textContent = '加载中…';
+  try {
+    const r = await api('/api/history?limit=300');
+    HIST = r.entries || [];
+    $('#histMsg').textContent = '共 ' + (r.total || 0) + ' 条记录';
+    renderHistory();
+  } catch (e) {
+    $('#histMsg').className = 'hint bad';
+    $('#histMsg').textContent = '加载失败：' + e.message;
+  }
+}
+
+function renderHistory() {
+  if (!HIST.length) {
+    $('#histList').innerHTML = '<div class="hint">还没有历史记录。<br>' +
+      '成功提取一次就会自动出现在这里；也可以点上面的「导入已有任务」，' +
+      '把 output 目录里已经提取过的任务补进来。</div>';
+    return;
+  }
+  // 按短剧分组：同一部剧的剧集收在一个标题下面
+  const order = [], byGroup = {};
+  HIST.forEach((e, i) => {
+    const g = e.group || '(未分组)';
+    if (!byGroup[g]) { byGroup[g] = []; order.push(g); }
+    byGroup[g].push({e: e, i: i});
+  });
+  let html = '';
+  order.forEach((g, gi) => {
+    const items = byGroup[g];
+    const newest = (items[0] && items[0].e) ? (items[0].e.episode || items[0].e.title || '') : '';
+    const opened = (OPEN_GROUPS.has(g) || (!GROUPS_SAVED && gi === 0)) ? ' open' : '';
+    html += '<div class="ghead' + opened + '" data-gtoggle="' + gi + '">' +
+      '<span class="caret">▶</span><span>📁 ' + esc(g) + '</span>' +
+      '<span class="cnt">' + items.length + ' 集' +
+        (newest ? '　最新 ' + esc(newest) : '') + '</span></div>';
+    html += '<div class="gbody' + opened + '" data-gbody="' + gi + '">';
+    html += items.map(it => {
+      const e = it.e, i = it.i;
+      const chips = [
+        e.author ? '作者：' + e.author : '',
+        e.chars ? e.chars + ' 字' : '',
+        e.engine || '',
+        esc(e.id || '')
+      ].filter(Boolean).map(x => '<span class="chip">' + x + '</span>').join('');
+      return '<div class="method">' +
+        '<div class="mhead" style="cursor:pointer" data-hview="' + i + '">' +
+          esc(e.episode || e.title || '未命名') +
+          '<span class="hint" style="float:right;margin:0">' + esc(e.created_str || '') + '</span></div>' +
+        '<div class="meta">' + chips + '</div>' +
+        '<div class="actions" style="margin:8px 0 0">' +
+          '<button class="btn ghost sm" data-hview="' + i + '">查看文案</button>' +
+          '<button class="btn ghost sm" data-hcopy="' + i + '">复制</button>' +
+          '<button class="btn ghost sm" data-hopen="' + i + '">打开文件夹</button>' +
+          '<button class="btn ghost sm" data-hdel="' + i + '">删除</button>' +
+        '</div></div>';
+    }).join('');
+    html += '</div>';
+  });
+  $('#histList').innerHTML = html;
+  ORDER = order;
+}
+
+async function showHistoryItem(i) {
+  const e = HIST[i];
+  if (!e) return;
+  try {
+    const r = await api('/api/history/item?id=' + encodeURIComponent(e.id));
+    const it = r.entry;
+    HIST_CUR = it;
+    $('#histList').classList.add('hide');
+    $('#histDetail').classList.remove('hide');
+    const m = [
+      it.title ? '标题：' + it.title : '',
+      it.author ? '作者：' + it.author : '',
+      it.chars ? it.chars + ' 字' : '',
+      it.engine || '',
+      it.created_str || ''
+    ].filter(Boolean).map(x => '<span class="chip">' + esc(x) + '</span>').join('');
+    $('#histMeta').innerHTML = m;
+    $('#histText').textContent = it.text || '（这条记录没有正文）';
+    $('#histFiles').innerHTML = Object.entries(it.files || {}).map(([k, p]) =>
+      '<a href="/api/file?path=' + encodeURIComponent(p) + '" target="_blank">' +
+      (FILE_NAMES[k] || k) + '</a>').join('');
+  } catch (err) {
+    $('#histMsg').className = 'hint bad';
+    $('#histMsg').textContent = '读取失败：' + err.message;
+  }
+}
+
+async function copyHistory() {
+  if (!HIST_CUR) return;
+  const t = $('#histText').textContent;
+  try { await navigator.clipboard.writeText(t); $('#histCopy').textContent = '已复制 ✓'; }
+  catch (e) { $('#histCopy').textContent = '复制失败'; }
+  setTimeout(() => $('#histCopy').textContent = '复制文案', 1600);
+}
+
+$('#histList').addEventListener('click', async (ev) => {
+  const gh = ev.target.closest('[data-gtoggle]');
+  if (gh) { toggleGroup(Number(gh.dataset.gtoggle)); return; }
+  const t = ev.target.closest('[data-hview],[data-hcopy],[data-hopen],[data-hdel]');
+  if (!t) return;
+  if (t.dataset.hview != null) { showHistoryItem(Number(t.dataset.hview)); return; }
+  const i = Number(t.dataset.hcopy != null ? t.dataset.hcopy :
+                   (t.dataset.hopen != null ? t.dataset.hopen : t.dataset.hdel));
+  const e = HIST[i];
+  if (!e) return;
+  if (t.dataset.hcopy != null) {
+    const full = await api('/api/history/item?id=' + encodeURIComponent(e.id));
+    try { await navigator.clipboard.writeText(full.entry.text || ''); t.textContent = '已复制 ✓'; }
+    catch (err) { t.textContent = '复制失败'; }
+    setTimeout(() => t.textContent = '复制', 1600);
+  } else if (t.dataset.hopen != null) {
+    await api('/api/open_folder', {path: e.outdir});
+  } else if (t.dataset.hdel != null) {
+    if (!confirm('确定删除这条历史记录吗？（不会删除磁盘上的文件）')) return;
+    await api('/api/history/delete', {id: e.id});
+    loadHistory();
+  }
+});
+
+$('#histRefresh').onclick = loadHistory;
+$('#histExpandAll').onclick = () => { ORDER.forEach((g, i) => toggleGroup(i, true)); };
+$('#histCollapseAll').onclick = () => { ORDER.forEach((g, i) => toggleGroup(i, false)); };
+$('#histCopy').onclick = copyHistory;
+$('#histOpen').onclick = async () => { if (HIST_CUR) await api('/api/open_folder', {path: HIST_CUR.outdir}); };
+$('#histBack').onclick = () => { $('#histDetail').classList.add('hide'); $('#histList').classList.remove('hide'); };
+$('#histScan').onclick = async () => {
+  $('#histMsg').className = 'hint';
+  $('#histMsg').textContent = '正在扫描 output 目录…';
+  try {
+    const r = await api('/api/history/scan', {});
+    $('#histMsg').textContent = '导入完成，新增 ' + r.added + ' 条';
+    await loadHistory();
+  } catch (e) { $('#histMsg').className = 'hint bad'; $('#histMsg').textContent = '导入失败：' + e.message; }
+};
+$('#histMigrate').onclick = async () => {
+  if (!confirm('把 output 下散落的 task_* 文件夹，按「短剧名 / 第N集」重新归档？\n（只移动本程序建的任务目录，不会改动其它文件）')) return;
+  $('#histMsg').className = 'hint';
+  $('#histMsg').textContent = '正在整理…';
+  try {
+    const r = await api('/api/history/migrate', {});
+    $('#histMsg').textContent = '整理完成，移动了 ' + r.moved + ' 个任务目录';
+    await loadHistory();
+  } catch (e) { $('#histMsg').className = 'hint bad'; $('#histMsg').textContent = '整理失败：' + e.message; }
+};
+$('#histClearAll').onclick = async () => {
+  if (!confirm('确定清空全部历史记录吗？（不会删除磁盘上的文件）')) return;
+  await api('/api/history/clear', {});
+  loadHistory();
+};
+</script>
+</body>
+</html>
